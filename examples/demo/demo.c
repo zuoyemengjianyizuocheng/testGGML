@@ -40,28 +40,31 @@ int main(void) {
     struct ggml_context* ctx = ggml_init(params); 
 
     // 2. Create tensors and set data
-    struct ggml_tensor* tensor_a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, cols_A, rows_A);  //创建tensor数据结构，内置1个结构体ctx，一个数组ne，一个类型定义GGML_TYPE_F32，从初始的ctx空间中分配部分内存存储数据二维数据A
+    struct ggml_tensor* tensor_a = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, cols_A, rows_A);  //创建tensor数据结构，内置1个结构体ctx，ne表示该数据的维度分布情况，类型定义GGML_TYPE_F32，从初始的ctx空间中分配部分内存存储数据二维数据A，列*行
     struct ggml_tensor* tensor_b = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, cols_B, rows_B);  // ggml_new_tensor_2d()会从ctx0的mem_buffer中分配一块内存来保存 tensor x
     memcpy(tensor_a->data, matrix_A, ggml_nbytes(tensor_a));   //赋值
     memcpy(tensor_b->data, matrix_B, ggml_nbytes(tensor_b));
 
 
-    // 3. Create a `ggml_cgraph` for mul_mat operation为mul_mat操作创建一个‘ ggml_cgraph ’
+    // 3. Create a `ggml_cgraph` for mul_mat operation为mul_mat操作创建一个‘ ggml_cgraph ’类型，
     struct ggml_cgraph* gf = ggml_new_graph(ctx);
 
     // result = a*b^T
     // Pay attention: ggml_mul_mat(A, B) ==> B will be transposed internally
     // the result is transposed  结果= a*b^T //注意：ggml_mul_mat(A， B) ==>；B会在内部转置 //结果被转置
-    struct ggml_tensor* result = ggml_mul_mat(ctx, tensor_a, tensor_b);
+    struct ggml_tensor* result = ggml_mul_mat(ctx, tensor_a, tensor_b);   //此处的result也是未计算状态，仅仅是将待计算变量放入result的数据结构中，等待前向计算开始计算
 
-    // Mark the "result" tensor to be computed 标记“结果”。待计算张量  //构建前向计算图 
+    // Mark the "result" tensor to be computed 标记“结果”。待计算张量  //构建前向计算图 ，并未进行计算
     ggml_build_forward_expand(gf, result);
-  
+    float* result_data2 = (float*)result->data;
+    for (int i = 0; i < 12/* cols */; i++) {
+        printf(" %.2f\n", result_data2[i]);
+    }
 
     // 4. Run the computation
     int n_threads = 1; // Optional: number of threads to perform some operations with multi-threading 可选：执行某些多线程操作的线程数,执行前向计算
-    ggml_graph_compute_with_ctx(ctx, gf, n_threads);
-    float* result_data1 = (float*)result->data;
+    ggml_graph_compute_with_ctx(ctx, gf, n_threads);  //开启线程计算，此刻才开始正式计算
+    float* result_data1 = (float*)result->data;  //tensor数据结构中的data指针指向真实data的位置，所以这里是直接赋值指针
     for (int i = 0; i < 12/* cols */; i++) {
         printf(" %.2f\n", result_data1[i]);
     }
@@ -79,9 +82,9 @@ int main(void) {
         }
     }
     printf(" ]\n");
-    ggml_build_backward_expand;
-
+   
     // 6. Free memory and exit
     ggml_free(ctx);
     return 0;
 }
+

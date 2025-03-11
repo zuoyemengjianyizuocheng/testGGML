@@ -5,7 +5,7 @@
 
 int main(int argc, const char ** argv) {
     struct ggml_init_params params = {
-        .mem_size   = 128*1024*1024,
+        .mem_size   = 128*1024*1024, //申请128MB内存
         .mem_buffer = NULL,
         .no_alloc   = false,
     };
@@ -34,6 +34,7 @@ int main(int argc, const char ** argv) {
     GGML_ASSERT(t3->nb[2]  == 10*20*sizeof(int32_t));
     GGML_ASSERT(t3->nb[3]  == 10*20*30*sizeof(int32_t));
 
+    //t1 t2 t3之间的对齐填充需要32字节，单一数据理论size，t1=4*10 ，t2=2*10*20，t3=4*10*20*30，但如果内存分类不是连续的，那么size大小就不是理论大小
     ggml_print_objects(ctx0);
 
     ggml_free(ctx0);
