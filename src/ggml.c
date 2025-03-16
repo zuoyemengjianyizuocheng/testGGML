@@ -881,7 +881,7 @@ static const size_t GGML_OBJECT_SIZE = sizeof(struct ggml_object);
 
 struct ggml_context {
     size_t mem_size;
-    void * mem_buffer;  //数据缓存空间是从init初始化的mem_size空间上分配的，由n_objects，objects_begin，objects_end管理该空间的位置
+    void * mem_buffer;  //数据缓存空间是从init初始化的mem_size空间上分配的，由n_objects，objects_begin，objects_end管理该空间的位置，void*指针是为了后续适配
     bool   mem_buffer_owned;
     bool   no_alloc;
 
@@ -1411,6 +1411,7 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
 
     ggml_critical_section_start(); //线程锁
 
+    //第一次调用才走下面
     if (is_first_call) {
         // initialize time system (required on Windows)，记录windows平台的时间信息
         ggml_time_init();
@@ -1420,7 +1421,7 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
                 uint16_t u16;
                 ggml_fp16_t fp16;
             } u = {i};
-            ggml_table_f32_f16[i] = GGML_COMPUTE_FP16_TO_FP32(u.fp16);   //浮点精度转换，4字节变2字节
+            ggml_table_f32_f16[i] = GGML_COMPUTE_FP16_TO_FP32(u.fp16);   //提前浮点精度转换，4字节变2字节
         }
 
         is_first_call = false;
@@ -1435,12 +1436,12 @@ struct ggml_context * ggml_init(struct ggml_init_params params) {
         params.mem_size = GGML_MEM_ALIGN;
     }
 
-    const size_t mem_size = params.mem_buffer ? params.mem_size : GGML_PAD(params.mem_size, GGML_MEM_ALIGN);  //选择大小，默认的还是计算后结果
+    const size_t mem_size = params.mem_buffer ? params.mem_size : GGML_PAD(params.mem_size, GGML_MEM_ALIGN);  //选择大小，默认的para还是计算后结果，GGML_PAD是内存对齐
 
     //结构体指针
     *ctx = (struct ggml_context) {  
-        /*.mem_size           =*/ mem_size,
-        /*.mem_buffer         =*/ params.mem_buffer ? params.mem_buffer : ggml_aligned_malloc(mem_size),
+        /*.mem_size           =*/ mem_size, //空间大小
+        /*.mem_buffer         =*/ params.mem_buffer ? params.mem_buffer : ggml_aligned_malloc(mem_size),        //分配size大小内存
         /*.mem_buffer_owned   =*/ params.mem_buffer ? false : true,
         /*.no_alloc           =*/ params.no_alloc,
         /*.n_objects          =*/ 0,
@@ -1514,16 +1515,17 @@ size_t ggml_get_max_tensor_size(const struct ggml_context * ctx) {
 
 static struct ggml_object * ggml_new_object(struct ggml_context * ctx, enum ggml_object_type type, size_t size) {
     // always insert objects at the end of the context's memory pool
-    struct ggml_object * obj_cur = ctx->objects_end;
+    struct ggml_object * obj_cur = ctx->objects_end; //ctx结构的节点结束位置
 
-    const size_t cur_offs = obj_cur == NULL ? 0 : obj_cur->offs;
-    const size_t cur_size = obj_cur == NULL ? 0 : obj_cur->size;
-    const size_t cur_end  = cur_offs + cur_size;
+    const size_t cur_offs = obj_cur == NULL ? 0 : obj_cur->offs; //结束位置的偏移
+    const size_t cur_size = obj_cur == NULL ? 0 : obj_cur->size;    //结束位置的占用大小
+    const size_t cur_end  = cur_offs + cur_size;    //真正的结束位置地址
 
-    // align to GGML_MEM_ALIGN
+    // align to GGML_MEM_ALIGN  数据对齐需要的字节大小
     size_t size_needed = GGML_PAD(size, GGML_MEM_ALIGN);
 
-    char * const mem_buffer = ctx->mem_buffer;
+    char * const mem_buffer = ctx->mem_buffer;      //ctx->mem_buffer为初始化申请的字节大小
+    //obj地址开始位置=mem_buffer大小+数据偏移量
     struct ggml_object * const obj_new = (struct ggml_object *)(mem_buffer + cur_end);
 
     if (cur_end + size_needed + GGML_OBJECT_SIZE > ctx->mem_size) {
@@ -1545,7 +1547,7 @@ static struct ggml_object * ggml_new_object(struct ggml_context * ctx, enum ggml
     GGML_ASSERT_ALIGNED(mem_buffer + obj_new->offs);
 
     if (obj_cur != NULL) {
-        obj_cur->next = obj_new;
+        obj_cur->next = obj_new;    //末尾object的next指针指向新生成的object的new地址
     } else {
         // this is the first object in this context
         ctx->objects_begin = obj_new;
@@ -1569,19 +1571,20 @@ static struct ggml_tensor * ggml_new_tensor_impl(
     GGML_ASSERT(type >= 0 && type < GGML_TYPE_COUNT);
     GGML_ASSERT(n_dims >= 1 && n_dims <= GGML_MAX_DIMS);
 
-    // find the base tensor and absolute offset
+    // find the base tensor and absolute offset 偏移
     if (view_src != NULL && view_src->view_src != NULL) {
         view_offs += view_src->view_offs;
         view_src   = view_src->view_src;
     }
 
-    size_t data_size = ggml_row_size(type, ne[0]);  //
+    size_t data_size = ggml_row_size(type, ne[0]);  //数据空间大小
     for (int i = 1; i < n_dims; i++) {
         data_size *= ne[i];
     }
 
     GGML_ASSERT(view_src == NULL || data_size == 0 || data_size + view_offs <= ggml_nbytes(view_src));
 
+    //加上数据后数据的相对偏移
     void * data = view_src != NULL ? view_src->data : NULL;
     if (data != NULL) {
         data = (char *) data + view_offs;
@@ -1590,13 +1593,13 @@ static struct ggml_tensor * ggml_new_tensor_impl(
     size_t obj_alloc_size = 0;
 
     if (view_src == NULL && !ctx->no_alloc) {
-        // allocate tensor data in the context's memory pool
+        // allocate tensor data in the context's memory pool 分配tensor数据在内存池
         obj_alloc_size = data_size;
     }
-    /* 从ctx0的mem_buffer为GGML_OBJECT_TYPE_TENSOR分配内存 */
+    /* 创建object 从ctx0的mem_buffer为GGML_OBJECT_TYPE_TENSOR分配内存 */
     struct ggml_object * const obj_new = ggml_new_object(ctx, GGML_OBJECT_TYPE_TENSOR, GGML_TENSOR_SIZE + obj_alloc_size);
     GGML_ASSERT(obj_new);
-    /*  tensor的起始地址为(char *)ctx->mem_buffer + obj_new->offs */
+    /*  tensor的起始地址为(char *)ctx->mem_buffer + obj_new->offs ，长度为一个ggml_tensor结构体的空间336字节*/
     struct ggml_tensor * const result = (struct ggml_tensor *)((char *)ctx->mem_buffer + obj_new->offs);
 
 
@@ -1606,13 +1609,13 @@ static struct ggml_tensor * ggml_new_tensor_impl(
         /*.buffer       =*/ NULL,
         /*.ne           =*/ { 1, 1, 1, 1 },
         /*.nb           =*/ { 0, 0, 0, 0 },
-        /*.op           =*/ GGML_OP_NONE,
+        /*.op           =*/ GGML_OP_NONE, //操作
         /*.op_params    =*/ { 0 },
         /*.flags        =*/ 0,           
         /*.src          =*/ { NULL },
         /*.view_src     =*/ view_src,
         /*.view_offs    =*/ view_offs,
-        /*.data         =*/ obj_alloc_size > 0 ? (void *)(result + 1) : data,
+        /*.data         =*/ obj_alloc_size > 0 ? (void *)(result + 1) : data, //data指向的指针，如果view_src大小为0，则是直接指向偏移后的地址，若不为0，则实际*result指针地址后一位 
         /*.name         =*/ { 0 },
         /*.extra        =*/ NULL,
         /*.padding      =*/ { 0 },
@@ -1626,7 +1629,7 @@ static struct ggml_tensor * ggml_new_tensor_impl(
     }
 
     result->nb[0] = ggml_type_size(type);
-    result->nb[1] = result->nb[0]*(result->ne[0]/ggml_blck_size(type));
+    result->nb[1] = result->nb[0]*(result->ne[0]/ggml_blck_size(type)); //维度分界线，nb[1]代表取数据第二维的开始位置(也即第一维的长度)
     for (int i = 2; i < GGML_MAX_DIMS; i++) {
         result->nb[i] = result->nb[i - 1]*result->ne[i - 1];
     }
