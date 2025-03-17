@@ -5741,24 +5741,24 @@ static void ggml_compute_backward(
 }
 
 static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor * node) {
-    // check if already visited
+    // check if already visited 判断hash表是否存在，如果不存在则插入，对used进行处理，如果存在多个输出，一旦递归遍历到已经遍历过的节点，则直接返回
     if (ggml_hash_insert(&cgraph->visited_hash_set, node) == GGML_HASHSET_ALREADY_EXISTS) {
         return;
     }
 
-    // 遍历src,递归调用，基于树状结构的深度优先的后序遍历。一个node的parents就是它的所有的非空的src。
+    // 遍历src,递归调用，基于树状结构的深度优先的后序遍历。从结果往源头倒推，找子节点的子节点，一个node的parents就是它的所有的非空的src。
     for (int i = 0; i < GGML_MAX_SRC; ++i) {
-        const int k =
-            (cgraph->order == GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT) ? i :
+        const int k = 
+            (cgraph->order == GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT) ? i :   //遍历顺序
             (cgraph->order == GGML_CGRAPH_EVAL_ORDER_RIGHT_TO_LEFT) ? (GGML_MAX_SRC-1-i) :
             /* unknown order, just fall back to using i*/ i;
         if (node->src[k]) {
-            ggml_visit_parents(cgraph, node->src[k]);
+            ggml_visit_parents(cgraph, node->src[k]);  //递归第几个源数据，
         }
     }
 
 
-    // 节点类型判定，叶节点，中间节点，变量节点
+    // 节点类型判定，叶节点，中间节点，变量节点，无操作并且无梯度，则为叶节点，
     if (node->op == GGML_OP_NONE && !(node->flags & GGML_TENSOR_FLAG_PARAM)) {
         // reached a leaf node, not part of the gradient graph (e.g. a constant)
         GGML_ASSERT(cgraph->n_leafs < cgraph->size);
@@ -5781,7 +5781,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
     }
 }
 
-static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor, bool expand) {
+static void 1(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor, bool expand) {
     if (!expand) {
         // TODO: this branch isn't accessible anymore, maybe move this to ggml_build_forward_expand
         // 入参的F为前向计算的最后节点
@@ -5911,12 +5911,12 @@ static void * incr_ptr_aligned(void ** p, size_t size, size_t align) {
 }
 
 static size_t ggml_graph_nbytes(size_t size, bool grads) {
-    size_t hash_size = ggml_hash_size(size * 2);
+    size_t hash_size = ggml_hash_size(size * 2);    //hash空间大小
     void * p = 0;
-    incr_ptr_aligned(&p, sizeof(struct ggml_cgraph), 1);
-    incr_ptr_aligned(&p, size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // nodes
-    incr_ptr_aligned(&p, size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // leafs
-    incr_ptr_aligned(&p, hash_size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // hash keys
+    incr_ptr_aligned(&p, sizeof(struct ggml_cgraph), 1);    //object大小
+    incr_ptr_aligned(&p, size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // nodes   存放节点指针的大小，最多2048个，一个指针8字节
+    incr_ptr_aligned(&p, size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // leafs   存放叶节点指针的大小，最多2048个，一个指针8字节
+    incr_ptr_aligned(&p, hash_size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // hash keys 存放hash表的大小
     if (grads) {
         incr_ptr_aligned(&p, hash_size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // grads
         incr_ptr_aligned(&p, hash_size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *)); // grad_accs
@@ -5936,15 +5936,16 @@ size_t ggml_graph_overhead(void) {
 }
 
 struct ggml_cgraph * ggml_new_graph_custom(struct ggml_context * ctx, size_t size, bool grads) {
-    const size_t obj_size = ggml_graph_nbytes(size, grads);
+    const size_t obj_size = ggml_graph_nbytes(size, grads); //计算图需要的空间，包括节点，叶节点，hash表以及对应的使用空间，一个obj，一个cgraph结构
     struct ggml_object * obj = ggml_new_object(ctx, GGML_OBJECT_TYPE_GRAPH, obj_size);
     struct ggml_cgraph * cgraph = (struct ggml_cgraph *) ((char *) ctx->mem_buffer + obj->offs);
 
     // the size of the hash table is doubled since it needs to hold both nodes and leafs
     size_t hash_size = ggml_hash_size(size * 2);
 
-    void * p = cgraph + 1;
+    void * p = cgraph + 1;  //指针指向cgraph结构的后一个结构
 
+    //分配内存
     struct ggml_tensor ** nodes_ptr     =         incr_ptr_aligned(&p, size      * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *));
     struct ggml_tensor ** leafs_ptr     =         incr_ptr_aligned(&p, size      * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *));
     struct ggml_tensor ** hash_keys_ptr =         incr_ptr_aligned(&p, hash_size * sizeof(struct ggml_tensor *), sizeof(struct ggml_tensor *));

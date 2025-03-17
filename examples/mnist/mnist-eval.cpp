@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
     const int64_t t_start_us = ggml_time_us();
     // 模型初始化--模型、后端、逻辑批处理大小决定有多少数据点用于梯度更新、物理批处理大小决定并行处理多少数据点
     mnist_model model = mnist_model_init_from_file(argv[1], backend, MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);
-    // 构建计算图
+    // 构建计算图,当前是分配内存以及 数据 
     mnist_model_build(model);
     const int64_t t_load_us = ggml_time_us() - t_start_us;
     fprintf(stdout, "%s: loaded model in %.2lf ms\n", __func__, t_load_us / 1000.0);
