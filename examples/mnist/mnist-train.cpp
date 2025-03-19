@@ -12,11 +12,19 @@
 #endif
 
 int main(int argc, char ** argv) {
+    argc = 5;
     if (argc != 5 && argc != 6) {
         fprintf(stderr, "Usage: %s mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte [CPU/CUDA0]\n", argv[0]);
         exit(0);
     }
-
+    //char str1[100] = "mnist-fc";
+    //char str0[100] = "C:/Users/cjj/Documents/testGGML/examples/mnist/data/MNIST/raw/mnist-fc-f32.gguf";
+    char str2[100] = "C:/Users/cjj/Documents/testGGML/examples/mnist/data/MNIST/raw/train-images-idx3-ubyte";
+    char str3[100] = "C:/Users/cjj/Documents/testGGML/examples/mnist/data/MNIST/raw/train-labels-idx1-ubyte";
+    /*argv[1] = str0;
+    argv[2] = str1;*/
+    argv[3] = str2;
+    argv[4] = str3;
     // The MNIST model is so small that the overhead from data shuffling is non-negligible, especially with CUDA.
     // With a shard size of 10 this overhead is greatly reduced at the cost of less shuffling (does not seem to have a significant impact).
     // A batch of 500 images then consists of 50 random shards of size 10 instead of 500 random shards of size 1.

@@ -182,9 +182,9 @@ static inline void ggml_bitset_clear(ggml_bitset_t * bitset, size_t i) {
 #define GGML_HASHSET_ALREADY_EXISTS ((size_t)-2)
 
 struct ggml_hash_set {
-    size_t size;
-    ggml_bitset_t * used;       // whether or not the keys are in use i.e. set
-    struct ggml_tensor ** keys; // actual tensors in the set, keys[i] is only defined if ggml_bitset_get(used, i)
+    size_t size;        //现在数据结构是f32，所以存used指针的字节大小需要计算，这里向上取整
+    ggml_bitset_t * used;       // whether or not the keys are in use i.e. set //用bit表示hash表中对应位置指针是否使用
+    struct ggml_tensor ** keys; // actual tensors in the set, keys[i] is only defined if ggml_bitset_get(used, i) hash表存指针
 };
 
 struct ggml_hash_set ggml_hash_set_new(size_t size);
@@ -235,7 +235,7 @@ static bool ggml_hash_contains(const struct ggml_hash_set * hash_set, struct ggm
 }
 
 static size_t ggml_hash_insert(struct ggml_hash_set * hash_set, struct ggml_tensor * key) {
-    size_t h = ggml_hash(key) % hash_set->size;
+    size_t h = ggml_hash(key) % hash_set->size;  //在hash表中找到对应的key位置
 
     // linear probing
     size_t i = h;
@@ -279,15 +279,15 @@ static size_t ggml_hash_find_or_insert(struct ggml_hash_set * hash_set, struct g
 // computation graph
 
 enum ggml_cgraph_eval_order {
-    GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT = 0,
+    GGML_CGRAPH_EVAL_ORDER_LEFT_TO_RIGHT = 0, 
     GGML_CGRAPH_EVAL_ORDER_RIGHT_TO_LEFT,
     GGML_CGRAPH_EVAL_ORDER_COUNT
 };
 
 struct ggml_cgraph {
-    int size;    // maximum number of nodes/leafs/grads/grad_accs
-    int n_nodes; // number of nodes currently in use
-    int n_leafs; // number of leafs currently in use
+    int size;    // maximum number of nodes/leafs/grads/grad_accs 空间大小
+    int n_nodes; // number of nodes currently in use 节点数
+    int n_leafs; // number of leafs currently in use 叶节点数
 
     //nodes, grads, leafs都是长度为GGML_DEFAULT_GRAPH_SIZE的数组，数组中的元素是指向tensor的指针。
     struct ggml_tensor ** nodes;     // tensors with data that can change if the graph is evaluated
@@ -297,7 +297,7 @@ struct ggml_cgraph {
 
     struct ggml_hash_set visited_hash_set;
 
-    enum ggml_cgraph_eval_order order;
+    enum ggml_cgraph_eval_order order;      //遍历顺序
 };
 
 // returns a slice of cgraph with nodes [i0, i1)

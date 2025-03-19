@@ -46,7 +46,7 @@ int main(void) {
     memcpy(tensor_b->data, matrix_B, ggml_nbytes(tensor_b));
 
 
-    // 3. Create a `ggml_cgraph` for mul_mat operation为mul_mat操作创建一个‘ ggml_cgraph ’类型，
+    // 3. Create a `ggml_cgraph` for mul_mat operation为mul_mat操作创建一个‘ ggml_cgraph ’类型，构建计算图谱空间分配等基本信息
     struct ggml_cgraph* gf = ggml_new_graph(ctx);
 
     // result = a*b^T

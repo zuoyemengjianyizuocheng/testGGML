@@ -132,6 +132,7 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
     mnist_model model(backend, nbatch_logical, nbatch_physical);
     fprintf(stderr, "%s: loading model weights from '%s'\n", __func__, fname.c_str());
 
+    //读取gguf模型的权重系数
     struct gguf_context * ctx;
     {
         struct gguf_init_params params = {
