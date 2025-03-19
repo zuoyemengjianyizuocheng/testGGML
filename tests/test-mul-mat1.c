@@ -26,6 +26,7 @@ uint64_t get_time_us(void) {
 // naive implementation
 //
 
+//float32类型的矩阵乘法
 void mul_mat_f32_0(
     const float * restrict src0, // M x K
     const float * restrict src1, // N x K (transposed)
@@ -35,9 +36,9 @@ void mul_mat_f32_0(
         for (int j = 0; j < n; j++) {
             float sum = 0;
             for (int l = 0; l < k; l++) {
-                sum += src0[i*k + l] * src1[j*k + l];
+                sum += src0[i * k + l] * src1[j * k + l];
             }
-            dst[i*n + j] = sum;
+            dst[i * n + j] = sum;
         }
     }
 }

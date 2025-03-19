@@ -4,6 +4,10 @@ include(CheckIncludeFileCXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_CXX_STANDARD 20)  # 设置C++标准为C++20
+set(CMAKE_CXX_STANDARD_REQUIRED ON)  # 强制要求使用C++20
+set(CMAKE_CXX_EXTENSIONS OFF)  # 禁用编译器扩展
+
 if (NOT XCODE AND NOT MSVC AND NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")

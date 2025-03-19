@@ -2,17 +2,18 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <time.h>
-
+//对比三种不同类型的矩阵乘法
 const int N = 1 << 14;
 const int M = 1 << 14;
 
+//普通浮点计算
 void mul_mat_vec_f32_0(
     const float * src0,
     const float * src1,
     float * dst,
     unsigned nrows,
     unsigned ncols) {
-    for (unsigned i = 0; i < nrows; i++) {
+    for (unsigned i = 0; i < nrows; i++) { //src0的第i行,第j列对应*src1的第j个数，列数相等
         float sum = 0.0f;
         for (unsigned j = 0; j < ncols; j++) {
             sum += src0[i*ncols + j]*src1[j];
@@ -21,10 +22,11 @@ void mul_mat_vec_f32_0(
     }
 }
 #if defined(_MSC_VER)
-typedef float __declspec(align(32)) afloat;
+typedef float __declspec(align(32)) afloat;  //align为存储对齐指示符
 #else
 typedef float afloat __attribute__((__aligned__(32)));
 #endif
+//内存对齐浮点计算
 void mul_mat_vec_f32_1(
     const afloat *restrict src0,
     const afloat *restrict src1,
@@ -63,6 +65,7 @@ void mul_mat_vec_f32_1(
     }
 }
 
+//地址位计算
 void mul_mat_vec_f32_2(
     const void * src0,
     const void * src1,

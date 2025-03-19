@@ -43,7 +43,7 @@ void mul_mat_vec_f16_0(
     for (int r = 0; r < nrows; r++) {
         float sumf = 0.0;
 
-        float16x8_t sum0 = vdupq_n_f16(0.0f);
+        float16x8_t sum0 = vdupq_n_f16(0.0f);       //NEON寄存器，NEON通过并行处理数据来提高计算效率，该处代码是创建一个新的 NEON 寄存器sum0，初始化值
         float16x8_t sum1 = vdupq_n_f16(0.0f);
         float16x8_t sum2 = vdupq_n_f16(0.0f);
         float16x8_t sum3 = vdupq_n_f16(0.0f);
