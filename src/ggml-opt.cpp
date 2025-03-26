@@ -79,12 +79,12 @@ ggml_opt_dataset_t ggml_opt_dataset_init(int64_t ne_datapoint, int64_t ne_label,
     GGML_ASSERT(ndata        >  0);
     GGML_ASSERT(ndata_shard  >  0);
 
-    ggml_opt_dataset_t result = new ggml_opt_dataset;
+    ggml_opt_dataset_t result = new ggml_opt_dataset;       //创建结果对象并设置其总数据点数量和分片后的数据点数量
     result->ndata       = ndata;
     result->ndata_shard = ndata_shard;
 
     {
-        struct ggml_init_params params = {
+        struct ggml_init_params params = {      //使用指定的内存大小初始化一个计算上下文 ctx。这里设置了内存大小为 2 * ggml_tensor_overhead()，并且不分配实际内存
             /*.mem_size   =*/ 2*ggml_tensor_overhead(),
             /*.mem_buffer =*/ nullptr,
             /*.no_alloc   =*/ true,
@@ -92,20 +92,21 @@ ggml_opt_dataset_t ggml_opt_dataset_init(int64_t ne_datapoint, int64_t ne_label,
         result->ctx = ggml_init(params);
     }
 
-    result->data = ggml_new_tensor_2d(result->ctx, GGML_TYPE_F32, ne_datapoint, ndata);
-    result->nbs_data = ggml_nbytes(result->data) * ndata_shard/ndata;
+    result->data = ggml_new_tensor_2d(result->ctx, GGML_TYPE_F32, ne_datapoint, ndata);     //创建数据张量
+    result->nbs_data = ggml_nbytes(result->data) * ndata_shard/ndata;       //创建一个二维浮点型张量来存储数据点，并计算每个分片的数据字节数
 
+    //创建标签张量（如果有）
     if (ne_label > 0) {
-        result->labels = ggml_new_tensor_2d(result->ctx, GGML_TYPE_F32, ne_label, ndata);
+        result->labels = ggml_new_tensor_2d(result->ctx, GGML_TYPE_F32, ne_label, ndata);       //如果标签数量大于0，则创建一个二维浮点型张量来存储标签，并计算每个分片的标签字节数。否则，将标签张量设置为 nullptr，并将标签字节数设置为0。
         result->nbs_labels = ggml_nbytes(result->labels) * ndata_shard/ndata;
     } else {
         result->labels = nullptr;
         result->nbs_labels = 0;
     }
 
-    result->buf = ggml_backend_alloc_ctx_tensors_from_buft(result->ctx, ggml_backend_cpu_buffer_type());
+    result->buf = ggml_backend_alloc_ctx_tensors_from_buft(result->ctx, ggml_backend_cpu_buffer_type());        //为上下文中的张量分配缓冲区。
 
-    const int64_t nshards = ndata/ndata_shard;
+    const int64_t nshards = ndata/ndata_shard;      //计算分片数量，并初始化排列数组，使其包含从0到 nshards-1 的索引。
     result->permutation.resize(nshards);
     for (int64_t i = 0; i < nshards; ++i) {
         result->permutation[i] = i;
@@ -531,6 +532,7 @@ void ggml_opt_result_ndata(ggml_opt_result_t result, int64_t * ndata) {
 void ggml_opt_result_loss(ggml_opt_result_t result, double * loss, double * unc) {
     const int64_t nbatches = result->loss.size(); // Number of physical batches.
 
+    //初始化
     if (nbatches == 0) {
         *loss = 0.0;
         *unc  = NAN;
@@ -540,9 +542,10 @@ void ggml_opt_result_loss(ggml_opt_result_t result, double * loss, double * unc)
     double sum         = 0.0;
     double sum_squared = 0.0;
 
+
     for (const float & loss : result->loss) {
         // If the loss is per datapoint it was scaled by 1.0f/opt_period for each physical batch.
-        const float loss_scaled = result->loss_per_datapoint ? loss*result->opt_period : loss;
+        const float loss_scaled = result->loss_per_datapoint ? loss*result->opt_period : loss;      //遍历每个批次的损失值，根据是否按数据点缩放损失值来计算实际的损失值 loss_scaled
         sum         += loss_scaled;
         sum_squared += loss_scaled*loss_scaled;
     }
@@ -559,7 +562,7 @@ void ggml_opt_result_loss(ggml_opt_result_t result, double * loss, double * unc)
         return;
     }
 
-    const double var_sum = sum_squared/nbatches - mean*mean; // variance without Bessel's correction, i.e. nbatches/(nbatches-1)
+    const double var_sum = sum_squared/nbatches - mean*mean; // variance without Bessel's correction, i.e. nbatches/(nbatches-1)计算方差 var_sum，这里没有使用贝塞尔校正（Bessel's correction），即方差计算公式为 (sum_squared/nbatches - mean*mean)
     *unc = result->loss_per_datapoint ? sqrt(var_sum / (nbatches - 1)) : sqrt(var_sum * nbatches/(nbatches - 1));
 }
 

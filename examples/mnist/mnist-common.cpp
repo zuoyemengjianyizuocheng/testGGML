@@ -137,7 +137,7 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
     {
         struct gguf_init_params params = {
             /*.no_alloc   =*/ true,
-            /*.ctx        =*/ &model.ctx_gguf,
+            /*.ctx        =*/ &model.ctx_gguf,  //指针指向&model.ctx_gguf
         };
         ctx = gguf_init_from_file(fname.c_str(), params);
         if (!ctx) {
@@ -145,11 +145,11 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
             exit(1);
         }
     }
-    model.arch = gguf_get_val_str(ctx, gguf_find_key(ctx, "general.architecture"));
+    model.arch = gguf_get_val_str(ctx, gguf_find_key(ctx, "general.architecture")); //获取结构类型
     fprintf(stderr, "%s: model arch is %s\n", __func__, model.arch.c_str());
 
     if (model.arch == "mnist-fc") {
-        model.fc1_weight = ggml_get_tensor(model.ctx_gguf, "fc1.weight");
+        model.fc1_weight = ggml_get_tensor(model.ctx_gguf, "fc1.weight");  //获取全连接层权重以及偏置的正确性，并确认维度正确
         GGML_ASSERT(model.fc1_weight->ne[0] == MNIST_NINPUT);
         GGML_ASSERT(model.fc1_weight->ne[1] == MNIST_NHIDDEN);
         GGML_ASSERT(model.fc1_weight->ne[2] == 1);
@@ -218,8 +218,10 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
         fprintf(stderr, "%s: unknown model arch: %s\n", __func__, model.arch.c_str());
     }
 
+    //为 ctx_gguf 上下文分配权重张量
     model.buf_gguf = ggml_backend_alloc_ctx_tensors(model.ctx_gguf, model.backends[0]);
 
+    //从文件中加载权重到 ctx。如果加载失败，打印错误信息并退出程序
     if(!load_from_gguf(fname.c_str(), model.ctx_gguf, ctx)) {
         fprintf(stderr, "%s: loading weights from %s failed\n", __func__, fname.c_str());
         exit(1);
@@ -228,10 +230,12 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
     // The space in ctx_gguf exactly fits the model weights,
     // the images (which also need to be statically allocated) need to be put in a different context.
 
+    //创建输入张量
     model.images = ggml_new_tensor_2d(model.ctx_static, GGML_TYPE_F32, MNIST_NINPUT, MNIST_NBATCH_PHYSICAL);
     ggml_set_name(model.images, "images");
     ggml_set_input(model.images);
 
+    //为 ctx_static 上下文分配张量
     model.buf_static = ggml_backend_alloc_ctx_tensors(model.ctx_static, model.backends[0]);
 
     fprintf(stderr, "%s: successfully loaded weights from %s\n", __func__, fname.c_str());
@@ -239,7 +243,7 @@ mnist_model mnist_model_init_from_file(const std::string & fname, const std::str
 }
 
 mnist_model mnist_model_init_random(const std::string & arch, const std::string & backend, const int nbatch_logical, const int nbatch_physical) {
-    mnist_model model(backend, nbatch_logical, nbatch_physical);
+    mnist_model model(backend, nbatch_logical, nbatch_physical); //初始化模型，backend为计算后端或设备类型。例如，它可以是 CPU、GPU 或其他硬件加速器
     model.arch = arch;
 
     std::random_device rd{};
@@ -250,17 +254,18 @@ mnist_model mnist_model_init_random(const std::string & arch, const std::string 
     if (model.arch == "mnist-fc") {
         fprintf(stderr, "%s: initializing random weights for a fully connected model\n", __func__);
 
-        model.fc1_weight = ggml_new_tensor_2d(model.ctx_static, GGML_TYPE_F32, MNIST_NINPUT,  MNIST_NHIDDEN);
-        model.fc1_bias   = ggml_new_tensor_1d(model.ctx_static, GGML_TYPE_F32,                MNIST_NHIDDEN);
-        model.fc2_weight = ggml_new_tensor_2d(model.ctx_static, GGML_TYPE_F32, MNIST_NHIDDEN, MNIST_NCLASSES);
-        model.fc2_bias   = ggml_new_tensor_1d(model.ctx_static, GGML_TYPE_F32,                MNIST_NCLASSES);
+        model.fc1_weight = ggml_new_tensor_2d(model.ctx_static, GGML_TYPE_F32, MNIST_NINPUT,  MNIST_NHIDDEN);  //全连接层1的权重，因为原始数据是二维图像，所以该权重为2维，隐含层500，MNIST_NINPUT为输入特征维度 ctx_static是创建张量的上下文或环境
+        model.fc1_bias   = ggml_new_tensor_1d(model.ctx_static, GGML_TYPE_F32,                MNIST_NHIDDEN);   //全连接层1的偏置
+        model.fc2_weight = ggml_new_tensor_2d(model.ctx_static, GGML_TYPE_F32, MNIST_NHIDDEN, MNIST_NCLASSES);  //全连接层2的权重
+        model.fc2_bias   = ggml_new_tensor_1d(model.ctx_static, GGML_TYPE_F32,                MNIST_NCLASSES);  //全连接层2的偏置
 
         ggml_set_name(model.fc1_weight, "fc1.weight");
         ggml_set_name(model.fc1_bias,   "fc1.bias");
         ggml_set_name(model.fc2_weight, "fc2.weight");
         ggml_set_name(model.fc2_bias,   "fc2.bias");
 
-        init_tensors.push_back(model.fc1_weight);
+        // 将神经网络模型中的权重和偏置张量添加到一个名为 init_tensors的容器当中
+        init_tensors.push_back(model.fc1_weight);       //push_back: 这是一个标准库函数，用于向容器末尾添加元素。
         init_tensors.push_back(model.fc1_bias);
         init_tensors.push_back(model.fc2_weight);
         init_tensors.push_back(model.fc2_bias);
@@ -293,17 +298,18 @@ mnist_model mnist_model_init_random(const std::string & arch, const std::string 
     ggml_set_name(model.images, "images");
     ggml_set_input(model.images);
 
+    //为 model.ctx_static 上下文分配一个静态缓冲区，并将其指针存储在 model.buf_static 中
     model.buf_static = ggml_backend_alloc_ctx_tensors(model.ctx_static, model.backends[0]);
 
     for (ggml_tensor * t : init_tensors) {
         GGML_ASSERT(t->type == GGML_TYPE_F32);
-        const int64_t ne = ggml_nelements(t);
-        std::vector<float> tmp(ne);
+        const int64_t ne = ggml_nelements(t); //获取张量的元素
+        std::vector<float> tmp(ne); //创建一个临时向量用于存储随机值
 
-        for (int64_t i = 0; i < ne; ++i) {
+        for (int64_t i = 0; i < ne; ++i) {  //填充临时向量
             tmp[i] = nd(gen);
         }
-        ggml_backend_tensor_set(t, tmp.data(), 0, ggml_nbytes(t));
+        ggml_backend_tensor_set(t, tmp.data(), 0, ggml_nbytes(t));      //将临时向量的数据设置到张量中
     }
 
     return model;
@@ -311,15 +317,15 @@ mnist_model mnist_model_init_random(const std::string & arch, const std::string 
 
 void mnist_model_build(mnist_model & model) {
     if (model.arch == "mnist-fc") {
-        ggml_set_param(model.ctx_compute, model.fc1_weight);
+        ggml_set_param(model.ctx_compute, model.fc1_weight);    //将全连接层的权重和偏置设置为模型的参数。这些参数将在训练过程中进行优化
         ggml_set_param(model.ctx_compute, model.fc1_bias);
         ggml_set_param(model.ctx_compute, model.fc2_weight);
         ggml_set_param(model.ctx_compute, model.fc2_bias);
 
-        ggml_tensor * fc1 = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
+        ggml_tensor * fc1 = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,        //第一层全连接层及其激活函数，计算输入图像与第一层全连接层权重矩阵的乘积，再加上第一层全连接层的偏置，最后对加偏置后的结果应用 ReLU 激活函数
             ggml_mul_mat(model.ctx_compute, model.fc1_weight, model.images),
             model.fc1_bias));
-        model.logits = ggml_add(model.ctx_compute,
+        model.logits = ggml_add(model.ctx_compute,              //第一层全连接层的输出与第二层全连接层权重矩阵的乘积，再加上第二层全连接层的偏置，直接输出
             ggml_mul_mat(model.ctx_compute, model.fc2_weight, fc1),
             model.fc2_bias);
     } else if (model.arch == "mnist-cnn") {
@@ -374,7 +380,7 @@ void mnist_model_build(mnist_model & model) {
     }
 
     ggml_set_name(model.logits, "logits");
-    ggml_set_output(model.logits);
+    ggml_set_output(model.logits);          //输出logits
     GGML_ASSERT(model.logits->type == GGML_TYPE_F32);
     GGML_ASSERT(model.logits->ne[0] == MNIST_NCLASSES);
     GGML_ASSERT(model.logits->ne[1] == model.nbatch_physical);
@@ -383,12 +389,18 @@ void mnist_model_build(mnist_model & model) {
 }
 
 ggml_opt_result_t mnist_model_eval(mnist_model & model, ggml_opt_dataset_t dataset) {
-    ggml_opt_result_t result = ggml_opt_result_init();
+    ggml_opt_result_t result = ggml_opt_result_init();      //初始化模型优化结果
 
     ggml_opt_params params = ggml_opt_default_params(model.backend_sched, model.ctx_compute, model.images, model.logits, GGML_OPT_LOSS_TYPE_CROSS_ENTROPY);
-    params.build_type = GGML_OPT_BUILD_TYPE_FORWARD;
-    ggml_opt_context_t opt_ctx = ggml_opt_init(params);
+    //调用了 ggml_opt_default_params 函数来生成默认的优化参数，并指定了使用的后端调度器、计算上下文、输入图像张量和输出日志张量。
+    // 同时，将损失类型设置为交叉熵损失（GGML_OPT_LOSS_TYPE_CROSS_ENTROPY）。
+    params.build_type = GGML_OPT_BUILD_TYPE_FORWARD;        //将构建类型设置为前向传播（GGML_OPT_BUILD_TYPE_FORWARD）
+    ggml_opt_context_t opt_ctx = ggml_opt_init(params);     //初始化优化上下文
 
+
+    /*然后调用 ggml_opt_epoch 函数对整个数据集进行一次完整的前向计算，并将结果存储在 result 中。计算完成后，
+    再次记录当前时间，并计算总耗时 t_total_us。接着，将总耗时转换为毫秒 t_total_ms，并获取数据集中样本的数量 nex。
+    最后，通过 fprintf 打印出模型评估的时间信息*/
     {
         const int64_t t_start_us = ggml_time_us();
 
@@ -407,6 +419,17 @@ ggml_opt_result_t mnist_model_eval(mnist_model & model, ggml_opt_dataset_t datas
 }
 
 void mnist_model_train(mnist_model & model, ggml_opt_dataset_t dataset, const int nepoch, const float val_split) {
+    /*model.backend_sched: 指定计算后端的调度器（scheduler），用于管理计算任务的执行。
+    model.ctx_compute : 计算上下文，包含所有张量和操作的定义。
+    model.images : 输入数据张量，通常是图像数据。
+    model.logits : 模型输出的 logits，即未经过激活函数处理的预测值。
+    dataset : 数据集对象，包含训练和验证数据。
+    GGML_OPT_LOSS_TYPE_CROSS_ENTROPY : 损失函数类型，这里使用的是交叉熵损失函数，常用于分类任务。
+    ggml_opt_get_default_optimizer_params : 获取默认的优化器参数，用于控制训练过程中的梯度下降等优化算法。
+    nepoch : 训练的轮数（epochs），即整个数据集将被遍历的次数。
+    model.nbatch_logical : 每个逻辑批次的大小，即每次更新模型参数时使用的样本数量。
+    val_split : 验证集的比例，用于在训练过程中评估模型性能。
+    false : 是否启用某些特定功能的标志位，这里为 false，表示不启用该功能。*/
     ggml_opt_fit(model.backend_sched, model.ctx_compute, model.images, model.logits, dataset,
         GGML_OPT_LOSS_TYPE_CROSS_ENTROPY, ggml_opt_get_default_optimizer_params, nepoch, model.nbatch_logical, val_split, false);
 }
@@ -414,8 +437,10 @@ void mnist_model_train(mnist_model & model, ggml_opt_dataset_t dataset, const in
 void mnist_model_save(mnist_model & model, const std::string & fname) {
     printf("%s: saving model to '%s'\n", __func__, fname.c_str());
 
+    //初始化一个 ggml_context 指针，指定内存100M，并用ggml_init初始化
     struct ggml_context * ggml_ctx;
     {
+        //
         struct ggml_init_params params = {
             /*.mem_size   =*/ 100 * 1024*1024,
             /*.mem_buffer =*/ NULL,
@@ -424,10 +449,12 @@ void mnist_model_save(mnist_model & model, const std::string & fname) {
         ggml_ctx = ggml_init(params);
     }
 
+    //初始化一个空的 gguf_context。使用 gguf_set_val_str 函数设置模型的架构信息
     gguf_context * gguf_ctx = gguf_init_empty();
     gguf_set_val_str(gguf_ctx, "general.architecture", model.arch.c_str());
 
     std::vector<struct ggml_tensor *> weights;
+    //  根据模型的架构类型（全连接网络或卷积神经网络），选择相应的权重张量
     if (model.arch == "mnist-fc") {
         weights = {model.fc1_weight, model.fc1_bias, model.fc2_weight, model.fc2_bias};
     } else if (model.arch == "mnist-cnn") {
@@ -435,13 +462,18 @@ void mnist_model_save(mnist_model & model, const std::string & fname) {
     } else {
         GGML_ASSERT(false);
     }
+    /*遍历选定的权重张量列表。
+    使用 ggml_dup_tensor 函数在新的 ggml_context 中复制每个权重张量。
+    设置复制张量的名称与原张量相同。
+    使用 ggml_backend_tensor_get 函数从原张量获取数据并填充到复制张量中。
+    将复制的张量添加到 gguf_context 中。*/
     for (struct ggml_tensor * t : weights) {
         struct ggml_tensor * copy = ggml_dup_tensor(ggml_ctx, t);
         ggml_set_name(copy, t->name);
         ggml_backend_tensor_get(t, copy->data, 0, ggml_nbytes(t));
         gguf_add_tensor(gguf_ctx, copy);
     }
-    gguf_write_to_file(gguf_ctx, fname.c_str(), false);
+    gguf_write_to_file(gguf_ctx, fname.c_str(), false);     //保存权重
 
     ggml_free(ggml_ctx);
     gguf_free(gguf_ctx);

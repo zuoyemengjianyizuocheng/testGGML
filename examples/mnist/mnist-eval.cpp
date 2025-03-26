@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     mnist_image_print(stdout, dataset, iex);
 
     // 模型初始化
-    const std::string backend = argc >= 5 ? argv[4] : "";  // 计算后端
+    const std::string backend = argc >= 5 ? argv[4] : "";  // 确定计算后端到底用什么
 
     // 计算时间
     const int64_t t_start_us = ggml_time_us();
