@@ -17,7 +17,7 @@ int main(int argc, char ** argv) {
         fprintf(stderr, "Usage: %s mnist-fc mnist-fc-f32.gguf data/MNIST/raw/train-images-idx3-ubyte data/MNIST/raw/train-labels-idx1-ubyte [CPU/CUDA0]\n", argv[0]);
         exit(0);
     }
-    //char str1[100] = "mnist-fc";
+    char str1[100] = "mnist-fc";
     //char str0[100] = "C:/Users/cjj/Documents/testGGML/examples/mnist/data/MNIST/raw/mnist-fc-f32.gguf";
     char str2[100] = "C:/Users/cjj/Documents/testGGML/examples/mnist/data/MNIST/raw/train-images-idx3-ubyte";
     char str3[100] = "C:/Users/cjj/Documents/testGGML/examples/mnist/data/MNIST/raw/train-labels-idx1-ubyte";

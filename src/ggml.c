@@ -6065,11 +6065,12 @@ struct ggml_tensor * ggml_set_zero(struct ggml_tensor * tensor) {
 
 void ggml_graph_reset(struct ggml_cgraph * cgraph) {
     GGML_ASSERT(cgraph->grads != NULL);
-
+    //遍历计算图中的所有节点，并根据节点的类型和属性对梯度进行相应的操作
     for (int i = 0; i < cgraph->n_nodes; i++) {
         struct ggml_tensor * node     = cgraph->nodes[i];
-        struct ggml_tensor * grad_acc = ggml_graph_get_grad_acc(cgraph, node);
+        struct ggml_tensor * grad_acc = ggml_graph_get_grad_acc(cgraph, node);      //梯度累加器 grad_acc（accumulate）
 
+        //如果节点的操作类型是 GGML_OP_OPT_STEP_ADAMW（AdamW优化步骤），则将该节点的源张量（momentum terms）清零。这是为了在每次优化步骤开始时重置动量
         if (node->op == GGML_OP_OPT_STEP_ADAMW) {
             // clear momenta
             ggml_set_zero(node->src[2]);
@@ -6080,17 +6081,17 @@ void ggml_graph_reset(struct ggml_cgraph * cgraph) {
         if (grad_acc) {
             if (node->flags & GGML_TENSOR_FLAG_LOSS) {
                 GGML_ASSERT(grad_acc->type == GGML_TYPE_F32);
-                GGML_ASSERT(ggml_is_scalar(grad_acc));
+                GGML_ASSERT(ggml_is_scalar(grad_acc));      //确认类型是标量
 
                 const float onef = 1.0f;
-                if (grad_acc->buffer) {
-                    ggml_backend_tensor_set(grad_acc, &onef, 0, sizeof(float));
+                if (grad_acc->buffer) {         //判定是否存在缓存
+                    ggml_backend_tensor_set(grad_acc, &onef, 0, sizeof(float));     //使用 ggml_backend_tensor_set 设置值
                 } else {
                     GGML_ASSERT(grad_acc->data);
-                    *((float *) grad_acc->data) = onef;
+                    *((float *) grad_acc->data) = onef;     //直接修改数据指针所指向的值
                 }
             } else {
-                ggml_set_zero(grad_acc);
+                ggml_set_zero(grad_acc);    //非损失节点，清零
             }
         }
     }

@@ -562,7 +562,8 @@ void ggml_opt_result_loss(ggml_opt_result_t result, double * loss, double * unc)
         return;
     }
 
-    const double var_sum = sum_squared/nbatches - mean*mean; // variance without Bessel's correction, i.e. nbatches/(nbatches-1)计算方差 var_sum，这里没有使用贝塞尔校正（Bessel's correction），即方差计算公式为 (sum_squared/nbatches - mean*mean)
+    const double var_sum = sum_squared/nbatches - mean*mean; // variance without Bessel's correction, i.e. nbatches/(nbatches-1)
+    //计算方差 var_sum，这里没有使用贝塞尔校正（Bessel's correction），即方差计算公式为 (sum_squared/nbatches - mean*mean)
     *unc = result->loss_per_datapoint ? sqrt(var_sum / (nbatches - 1)) : sqrt(var_sum * nbatches/(nbatches - 1));
 }
 
@@ -587,8 +588,10 @@ void ggml_opt_result_accuracy(ggml_opt_result_t result, double * accuracy, doubl
 
 static void ggml_opt_eval_graph(ggml_opt_context_t opt_ctx, ggml_cgraph * graph, ggml_opt_result * result) {
     if (graph != opt_ctx->gf) {
+        //如果当前图 graph 与优化上下文中的图 opt_ctx->gf 不同，则获取优化参数 opt_pars
         struct ggml_opt_optimizer_params opt_pars = opt_ctx->get_opt_pars(opt_ctx->get_opt_pars_ud);
 
+        //范围判定
         GGML_ASSERT(opt_pars.adamw.alpha >  0.0f);
         GGML_ASSERT(opt_pars.adamw.beta1 >= 0.0f);
         GGML_ASSERT(opt_pars.adamw.beta1 <= 1.0f);
@@ -598,10 +601,11 @@ static void ggml_opt_eval_graph(ggml_opt_context_t opt_ctx, ggml_cgraph * graph,
         GGML_ASSERT(opt_pars.adamw.wd    >= 0.0f);
         GGML_ASSERT(opt_pars.adamw.wd    <= 1.0f);
 
-        // beta1, beta2 after applying warmup
+        // beta1, beta2 after applying warmup，计算 beta1 和 beta2 的调整值
         const float beta1h = 1.0f/(1.0f - powf(opt_pars.adamw.beta1, opt_ctx->iter));
         const float beta2h = 1.0f/(1.0f - powf(opt_pars.adamw.beta2, opt_ctx->iter));
 
+        //更新 AdamW 参数
         float * adamw_par_data = ggml_get_data_f32(opt_ctx->adamw_params);
         adamw_par_data[0] = opt_pars.adamw.alpha;
         adamw_par_data[1] = opt_pars.adamw.beta1;
@@ -612,22 +616,24 @@ static void ggml_opt_eval_graph(ggml_opt_context_t opt_ctx, ggml_cgraph * graph,
         adamw_par_data[6] = beta2h;
     }
 
-    ggml_opt_alloc_graph(opt_ctx, graph);
-    ggml_backend_sched_graph_compute(opt_ctx->backend_sched, opt_ctx->allocated_graph_copy);
-    opt_ctx->iter += opt_ctx->allocated_graph == opt_ctx->gb_opt;
+    ggml_opt_alloc_graph(opt_ctx, graph);       //分配计算图的内存空间
+    ggml_backend_sched_graph_compute(opt_ctx->backend_sched, opt_ctx->allocated_graph_copy);        //计算计算图的内容
+    opt_ctx->iter += opt_ctx->allocated_graph == opt_ctx->gb_opt;       //更新迭代次数
 
+    //如果 result 为空，直接返回；否则，初始化或验证 result 中的一些属性
     if (!result) {
         return;
     }
 
     if (result->ndata == 0) {
-        result->loss_per_datapoint = opt_ctx->loss_per_datapoint;
-        result->opt_period         = opt_ctx->opt_period;
+        result->loss_per_datapoint = opt_ctx->loss_per_datapoint;   //损失缩放值
+        result->opt_period         = opt_ctx->opt_period;           //优化周期
     } else {
         GGML_ASSERT(result->loss_per_datapoint == opt_ctx->loss_per_datapoint);
         GGML_ASSERT(result->opt_period         == opt_ctx->opt_period);
     }
 
+    //更新result中的ndata，loss以及perd
     const int64_t ndata = opt_ctx->outputs->ne[1];
     GGML_ASSERT(result->ndata == ndata*int64_t(result->loss.size()) && "varying batch size not supported");
     result->ndata += ndata;
@@ -643,6 +649,7 @@ static void ggml_opt_eval_graph(ggml_opt_context_t opt_ctx, ggml_cgraph * graph,
     ggml_backend_tensor_get(opt_ctx->pred, pred.data(), 0, ggml_nbytes(opt_ctx->pred));
     result->pred.insert(result->pred.end(), pred.begin(), pred.end());
 
+    //如果存在标签且 ncorrect 大于等于0，则更新 ncorrect
     if (!opt_ctx->labels || result->ncorrect < 0) {
         result->ncorrect = -1;
         return;
@@ -656,23 +663,25 @@ static void ggml_opt_eval_graph(ggml_opt_context_t opt_ctx, ggml_cgraph * graph,
 }
 
 void ggml_opt_forward(ggml_opt_context_t opt_ctx, ggml_opt_result * result) {
-    ggml_opt_eval_graph(opt_ctx, opt_ctx->gf, result);
+    ggml_opt_eval_graph(opt_ctx, opt_ctx->gf, result);      //直接评估结果
 }
 
 void ggml_opt_forward_backward(ggml_opt_context_t opt_ctx, ggml_opt_result * result) {
+    //如果 opt_period 等于 1，则直接调用 ggml_opt_eval_graph 函数对优化图进行评估，并返回。这意味着每次迭代都会进行评估
     if (opt_ctx->opt_period == 1) {
-        ggml_opt_eval_graph(opt_ctx, opt_ctx->gb_opt, result);
+        ggml_opt_eval_graph(opt_ctx, opt_ctx->gb_opt, result);      //对梯度图进行评估，gb_opt为优化，gb_grad为梯度
         return;
     }
 
+    //计算下一个优化索引
     const int32_t opt_i_next = (opt_ctx->opt_i + 1) % opt_ctx->opt_period;
-    if (opt_i_next == 0) {
+    if (opt_i_next == 0) {      //优化周期末尾
         ggml_opt_eval_graph(opt_ctx, opt_ctx->gb_opt, result);
-        ggml_opt_reset(opt_ctx, /*optimizer =*/ false);
+        ggml_opt_reset(opt_ctx, /*optimizer =*/ false);     //重置优化器，但保留优化器参数
     } else {
         ggml_opt_eval_graph(opt_ctx, opt_ctx->gb_grad, result);
     }
-    opt_ctx->opt_i = opt_i_next;
+    opt_ctx->opt_i = opt_i_next;    //优化索引更新
 }
 
 // ====== High-Level Functions ======
@@ -685,34 +694,36 @@ void ggml_opt_epoch(
         int64_t                 idata_split,
         ggml_opt_epoch_callback callback_train,
         ggml_opt_epoch_callback callback_eval) {
-    struct ggml_tensor * inputs = ggml_opt_inputs(opt_ctx);
-    struct ggml_tensor * labels = ggml_opt_labels(opt_ctx);
-    struct ggml_tensor * data   = ggml_opt_dataset_data(dataset);
-    GGML_ASSERT(data->ne[0] == inputs->ne[0]);
+    struct ggml_tensor * inputs = ggml_opt_inputs(opt_ctx);     //输入张量
+    struct ggml_tensor * labels = ggml_opt_labels(opt_ctx);     //标签张量
+    struct ggml_tensor * data   = ggml_opt_dataset_data(dataset);       //整个数据集的张量
+    GGML_ASSERT(data->ne[0] == inputs->ne[0]);  
 
-    const int64_t ndata       =   data->ne[1];
-    const int64_t ndata_batch = inputs->ne[1];
+    const int64_t ndata       =   data->ne[1];      //计算数据
+    const int64_t ndata_batch = inputs->ne[1];      //每批次计算数
 
     GGML_ASSERT(data->ne[1] % inputs->ne[1] == 0);
-    const int64_t nbatches = ndata/ndata_batch;
+    const int64_t nbatches = ndata/ndata_batch;     //计算批次
 
-    idata_split = idata_split < 0 ? ndata : idata_split;
-    GGML_ASSERT(idata_split % ndata_batch == 0);
-    const int64_t ibatch_split = idata_split / ndata_batch;
+    idata_split = idata_split < 0 ? ndata : idata_split;        //验证集与训练集的分割点
+    GGML_ASSERT(idata_split % ndata_batch == 0);        //断言确认整除
+    const int64_t ibatch_split = idata_split / ndata_batch;     //验证集开始批次
 
     int64_t ibatch = 0;
     int64_t t_loop_start = ggml_time_us();
+    //训练
     for (; ibatch < ibatch_split; ++ibatch) {
-        ggml_opt_dataset_get_batch(dataset, inputs, labels, ibatch);
-        ggml_opt_forward_backward(opt_ctx, result_train);
+        ggml_opt_dataset_get_batch(dataset, inputs, labels, ibatch);        //获取数据以及标签填充到labels和inputs
+        ggml_opt_forward_backward(opt_ctx, result_train);       //前向以及后向传播进行模型训练
         if (callback_train) {
             callback_train(true, opt_ctx, dataset, result_train, ibatch+1, ibatch_split, t_loop_start);
         }
     }
     t_loop_start = ggml_time_us();
+    //验证
     for (; ibatch < nbatches; ++ibatch) {
         ggml_opt_dataset_get_batch(dataset, inputs, labels, ibatch);
-        ggml_opt_forward(opt_ctx, result_eval);
+        ggml_opt_forward(opt_ctx, result_eval);     //前向传播用于验证结果
         if (callback_eval) {
             callback_eval(false, opt_ctx, dataset, result_eval, ibatch+1-ibatch_split, nbatches-ibatch_split, t_loop_start);
         }
@@ -792,16 +803,22 @@ void ggml_opt_fit(
         float                           val_split,
         bool                            silent) {
     ggml_time_init();
-    const int64_t t_start_us = ggml_time_us();
+    const int64_t t_start_us = ggml_time_us();      //初始化时间测量
 
+
+    /*定义了数据集的总大小 ndata 和每个物理批次的大小 nbatch_physical。
+    然后通过断言确保逻辑批次大小 nbatch_logical 是物理批次大小的整数倍，并且数据集大小是逻辑批次大小的整数倍*/
     const int64_t ndata           = ggml_opt_dataset_data(dataset)->ne[1];
     const int64_t nbatch_physical = inputs->ne[1];
     GGML_ASSERT(ndata          % nbatch_logical  == 0);
     GGML_ASSERT(nbatch_logical % nbatch_physical == 0);
 
+
+    //计算优化周期 opt_period 和逻辑批次的数量 nbatches_logical
     const int64_t opt_period       = nbatch_logical / nbatch_physical;
     const int64_t nbatches_logical = ndata / nbatch_logical;
 
+    //验证集比例，计算验证集和训练集的分割点
     GGML_ASSERT(val_split >= 0.0f);
     GGML_ASSERT(val_split <  1.0f);
     const int64_t ibatch_split = int64_t(((1.0f - val_split) * nbatches_logical)) * opt_period; // train <-> val split index (physical)
@@ -809,6 +826,7 @@ void ggml_opt_fit(
 
     int64_t epoch = 1;
 
+    //初始化优化参数和上下文，设置优化周期和其他相关参数
     ggml_opt_params params = ggml_opt_default_params(backend_sched, ctx_compute, inputs, outputs, loss_type);
     params.opt_period      = opt_period;
     params.get_opt_pars    = get_opt_pars;
@@ -816,13 +834,16 @@ void ggml_opt_fit(
     ggml_opt_context_t opt_ctx = ggml_opt_init(params);
 
     // Shuffling the data is generally useful but there is only a point if not all data is used in a single batch.
+    //如果逻辑批次大小小于数据集大小，则对所有数据进行洗牌。
     if (nbatch_logical < ndata) {
         ggml_opt_dataset_shuffle(opt_ctx, dataset, -1); // Shuffle all data (train + validation).
     }
 
+    //训练集以及测试集结果记录
     ggml_opt_result_t result_train = ggml_opt_result_init();
     ggml_opt_result_t result_val   = ggml_opt_result_init();
 
+    //设置回调函数：根据是否静默模式设置回调函数
     ggml_opt_epoch_callback epoch_callback = silent ? nullptr : ggml_opt_epoch_callback_progress_bar;
 
     for (; epoch <= nepoch; ++epoch) {
@@ -836,12 +857,14 @@ void ggml_opt_fit(
         if (!silent) {
             fprintf(stderr, "%s: epoch %04" PRId64 "/%04" PRId64 ":\n", __func__, epoch, nepoch);
         }
+        //实际的训练过程
         ggml_opt_epoch(opt_ctx, dataset, result_train, result_val, idata_split, epoch_callback, epoch_callback);
         if (!silent) {
             fprintf(stderr, "\n");
         }
     }
 
+    //打印时间
     if (!silent) {
         int64_t t_total_s = (ggml_time_us() - t_start_us) / 1000000;
         const int64_t t_total_h = t_total_s / 3600;
@@ -851,6 +874,7 @@ void ggml_opt_fit(
         fprintf(stderr, "%s: training took %02" PRId64 ":%02" PRId64 ":%02" PRId64 "\n", __func__, t_total_h, t_total_m, t_total_s);
     }
 
+    //释放资源
     ggml_opt_free(opt_ctx);
     ggml_opt_result_free(result_train);
     ggml_opt_result_free(result_val);

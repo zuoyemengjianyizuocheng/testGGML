@@ -1569,9 +1569,10 @@ bool ggml_backend_sched_alloc_graph(ggml_backend_sched_t sched, struct ggml_cgra
 }
 
 enum ggml_status ggml_backend_sched_graph_compute(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
-    enum ggml_status err = ggml_backend_sched_graph_compute_async(sched, graph);
-    ggml_backend_sched_synchronize(sched);
-    return err;
+    //整个函数的作用是异步地计算一个图。同步调度器以确保所有异步任务完成。返回异步计算的错误状态
+    enum ggml_status err = ggml_backend_sched_graph_compute_async(sched, graph);        //该函数用于在后台异步地计算指定的图，此处是graph，sched 是调度器对象，负责管理和调度计算任务，返回一个 ggml_status 类型的值，表示操作的状态或结果，并将其存储在变量 err 中
+    ggml_backend_sched_synchronize(sched);      //该函数用于同步调度器 sched，同步意味着等待所有先前提交的异步任务完成
+    return err;     //将之前保存的错误状态 err 作为函数的返回值返回给调用者
 }
 
 enum ggml_status ggml_backend_sched_graph_compute_async(ggml_backend_sched_t sched, struct ggml_cgraph * graph) {
