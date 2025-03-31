@@ -28,7 +28,7 @@ int main(int argc, const char** argv) {
         struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
         memcpy(t->data, buf_f32, ggml_nbytes(t));
 
-        struct ggml_tensor * t_pooled = ggml_pool_1d(ctx, t, GGML_OP_POOL_AVG, 3, 3, 0);
+        struct ggml_tensor * t_pooled = ggml_pool_1d(ctx, t, GGML_OP_POOL_AVG, 3, 3, 0);        //创建一维池化
         GGML_ASSERT(t_pooled->ne[0] == 3);
         GGML_ASSERT(t_pooled->ne[1] == 2);
         GGML_ASSERT(t_pooled->ne[2] == 1);

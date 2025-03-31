@@ -806,8 +806,8 @@ void ggml_opt_fit(
     const int64_t t_start_us = ggml_time_us();      //初始化时间测量
 
 
-    /*定义了数据集的总大小 ndata 和每个物理批次的大小 nbatch_physical。
-    然后通过断言确保逻辑批次大小 nbatch_logical 是物理批次大小的整数倍，并且数据集大小是逻辑批次大小的整数倍*/
+    //定义了数据集的总大小 ndata 和每个物理批次的大小 nbatch_physical。
+    //然后通过断言确保逻辑批次大小 nbatch_logical 是物理批次大小的整数倍，并且数据集大小是逻辑批次大小的整数倍
     const int64_t ndata           = ggml_opt_dataset_data(dataset)->ne[1];
     const int64_t nbatch_physical = inputs->ne[1];
     GGML_ASSERT(ndata          % nbatch_logical  == 0);

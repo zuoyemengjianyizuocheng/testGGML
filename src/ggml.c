@@ -2964,7 +2964,7 @@ static struct ggml_tensor * ggml_cont_impl(
     struct ggml_tensor * result = ggml_dup_tensor(ctx, a);
     ggml_format_name(result, "%s (cont)", a->name);
 
-    result->op     = GGML_OP_CONT;
+    result->op     = GGML_OP_CONT;      
     result->src[0] = a;
 
     return result;
@@ -3268,13 +3268,13 @@ struct ggml_tensor * ggml_permute(
 struct ggml_tensor * ggml_transpose(
         struct ggml_context * ctx,
         struct ggml_tensor  * a) {
-    struct ggml_tensor * result = ggml_view_tensor(ctx, a);
+    struct ggml_tensor * result = ggml_view_tensor(ctx, a);     //为result申请空间以及内存
     ggml_format_name(result, "%s (transposed)", a->name);
 
-    result->ne[0] = a->ne[1];
+    result->ne[0] = a->ne[1];       //result的维度信息由a的维度转置组成
     result->ne[1] = a->ne[0];
 
-    result->nb[0] = a->nb[1];
+    result->nb[0] = a->nb[1];       //result的数据信息由a的数据信息的维度组成
     result->nb[1] = a->nb[0];
 
     result->op     = GGML_OP_TRANSPOSE;
@@ -4070,18 +4070,18 @@ struct ggml_tensor * ggml_pool_1d(
         int                   s0,
         int                   p0) {
     const int64_t ne[4] = {
-        ggml_calc_pool_output_size(a->ne[0], k0, s0, p0),
+        ggml_calc_pool_output_size(a->ne[0], k0, s0, p0),       //计算池化操作后的输出尺寸。这里假设输入张量 a 有四个维度，但池化操作通常只影响第一个维度
         a->ne[1],
         a->ne[2],
         a->ne[3],
     };
-    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);
+    struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F32, 4, ne);       //维度=4，尺寸由ne决定
 
     int32_t params[] = { op, k0, s0, p0 };
-    ggml_set_op_params(result, params, sizeof(params));
+    ggml_set_op_params(result, params, sizeof(params));     //将池化操作的参数（包括操作类型、窗口大小、步幅和填充大小）存储到 result 张量的操作参数中
 
     result->op     = GGML_OP_POOL_1D;
-    result->src[0] = a;
+    result->src[0] = a;     //将输入张量 a 设置为 result 张量的源张量
 
     return result;
 }
@@ -5781,7 +5781,7 @@ static void ggml_visit_parents(struct ggml_cgraph * cgraph, struct ggml_tensor *
     }
 }
 
-static void 1(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor, bool expand) {
+static void ggml_build_forward_impl(struct ggml_cgraph * cgraph, struct ggml_tensor * tensor, bool expand) {
     if (!expand) {
         // TODO: this branch isn't accessible anymore, maybe move this to ggml_build_forward_expand
         // 入参的F为前向计算的最后节点

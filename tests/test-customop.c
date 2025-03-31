@@ -1,6 +1,5 @@
 #include "ggml.h"
 #include "ggml-cpu.h"
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -39,23 +38,25 @@ void custom1(struct ggml_tensor * dst , const struct ggml_tensor * a, int ith, i
     assert(userdata == NULL);
     assert(ggml_are_same_shape(dst, a));
 
-    atomic_fetch_add(&g_custom1_count, 1);
+    //atomic_fetch_add 函数会获取一个原子类型的当前值，将给定的递增值添加到这个原子值上，然后返回原始的未递增的值。
+    // 整个操作是原子性的，即从读取（返回）值到此函数修改值的时刻，该值不受其他线程的影响
+    atomic_fetch_add(&g_custom1_count, 1);      //指定原子加法
 
-    const float * a_data = ggml_get_data_f32(a);
+    const float * a_data = ggml_get_data_f32(a);        //返回tensor a的data指针给指针a_data
     float * dst_data = ggml_get_data_f32(dst);
 
-    // this assumes that the tensors are contiguous
+    //this assumes that the tensors are contiguous 张量连续
     assert(ggml_is_contiguous(dst));
     assert(ggml_is_contiguous(a));
 
-    // parallelize by elements
-    const int ne = (int)ggml_nelements(dst);
+    // parallelize by elements 按元素并行化
+    const int ne = (int)ggml_nelements(dst);        //元素个数
     const int dr = (ne + nth - 1) / nth;
     const int ie0 = dr * ith;
     const int ie1 = MIN(ie0 + dr, ne);
 
     for (int i = ie0; i < ie1; ++i) {
-        dst_data[i] = a_data[i] * 2;
+        dst_data[i] = a_data[i] * 2;        
     }
 }
 
@@ -66,7 +67,7 @@ void custom2(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     assert(ggml_are_same_shape(dst, a));
     assert(ggml_are_same_shape(dst, b));
 
-    atomic_fetch_add(&g_custom2_count, 1);
+    atomic_fetch_add(&g_custom2_count, 1); 
 
     const float * a_data = ggml_get_data_f32(a);
     const float * b_data = ggml_get_data_f32(b);
@@ -74,16 +75,16 @@ void custom2(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
 
     // parallelize by rows
     const int nr = (int)ggml_nrows(dst);
-    // number of rows per thread
+    // number of rows per thread  每个线程的行数
     const int dr = (nr + nth - 1) / nth;
-    // row range for this thread
+    // row range for this thread 此线程的行范围
     const int ir0 = dr * ith;
     const int ir1 = MIN(ir0 + dr, nr);
 
-    // number of columns
+    // number of columns 列数
     const int nc = (int)dst->ne[0];
 
-    // this assumes that the tensors are contiguous
+    // this assumes that the tensors are contiguous 连续性检测
     assert(ggml_is_contiguous(dst));
     assert(ggml_is_contiguous(a));
     assert(ggml_is_contiguous(b));
@@ -91,7 +92,7 @@ void custom2(struct ggml_tensor * dst , const struct ggml_tensor * a, const stru
     for (int ir = ir0; ir < ir1; ++ir) {
         for (int ic = 0; ic < nc; ++ic) {
             const int i = ir * nc + ic;
-            dst_data[i] = a_data[i] + b_data[i];
+            dst_data[i] = a_data[i] + b_data[i]; 
         }
     }
 }
@@ -146,18 +147,18 @@ int main(int argc, const char** argv) {
     // map_custom1
     // 2 tasks, no userdata, parallelized by elements
     {
-        struct ggml_context * ctx = make_ctx();
-        struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
-        memcpy(t->data, buf1_f32, ggml_nbytes(t));
+        struct ggml_context * ctx = make_ctx();     //新建结构，初始化上下文的空间以及内存分配情况
+        struct ggml_tensor * t = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);     //在ctx中分配一个tensor t的空间，维度为10*2，类型F32
+        memcpy(t->data, buf1_f32, ggml_nbytes(t));      //tensor t的data指针指向buf1_f32
 
-        struct ggml_tensor * m1 = ggml_map_custom1(ctx, t, custom1, 2, NULL);
+        struct ggml_tensor * m1 = ggml_map_custom1(ctx, t, custom1, 2, NULL);       // 自定义操作custom1 ， 执行2次，没有userdata，按元素并行化
 
-        struct ggml_cgraph * graph = ggml_new_graph(ctx);
-        ggml_build_forward_expand(graph, m1);
+        struct ggml_cgraph * graph = ggml_new_graph(ctx);       //创建图
+        ggml_build_forward_expand(graph, m1);       //构建图计算逻辑，使用映射的自定义操作m1构建图的前向传递
 
-        ggml_graph_compute_with_ctx(ctx, graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);     //使用4个线程计算上面上下文的图。
 
-        const float * output = ggml_get_data_f32(m1);
+        const float * output = ggml_get_data_f32(m1);       //获取计算完后的m1的data指针
 
         for (int i = 0; i < ggml_nelements(m1); ++i) {
             assert(output[i] == buf1_f32[i] * 2);
@@ -176,12 +177,13 @@ int main(int argc, const char** argv) {
         struct ggml_tensor * t2 = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
         memcpy(t2->data, buf2_f32, ggml_nbytes(t2));
 
+        //将自定义操作custom2映射到最大并行度的输入张量t1和t2， userdata "ggml"，执行GGML_N_TASKS_MAX次
         struct ggml_tensor * m2 = ggml_map_custom2(ctx, t1, t2, custom2, GGML_N_TASKS_MAX, g_userdata);
 
         struct ggml_cgraph * graph = ggml_new_graph(ctx);
         ggml_build_forward_expand(graph, m2);
 
-        ggml_graph_compute_with_ctx(ctx, graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);     //4线程
 
         const float * output = ggml_get_data_f32(m2);
 
@@ -205,12 +207,12 @@ int main(int argc, const char** argv) {
         struct ggml_tensor * t3 = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 10, 2);
         memcpy(t3->data, buf3_f32, ggml_nbytes(t3));
 
-        struct ggml_tensor * m3 = ggml_map_custom3(ctx, t1, t2, t3, custom3, 1, g_userdata);
+        struct ggml_tensor * m3 = ggml_map_custom3(ctx, t1, t2, t3, custom3, 1, g_userdata);        //task==1
 
         struct ggml_cgraph * graph = ggml_new_graph(ctx);
         ggml_build_forward_expand(graph, m3);
 
-        ggml_graph_compute_with_ctx(ctx, graph, 4);
+        ggml_graph_compute_with_ctx(ctx, graph, 4);     //4线程
 
         const float * output = ggml_get_data_f32(m3);
 

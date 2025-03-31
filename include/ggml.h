@@ -429,50 +429,50 @@ extern "C" {
     enum ggml_op {
         GGML_OP_NONE = 0,
 
-        GGML_OP_DUP,
-        GGML_OP_ADD,
-        GGML_OP_ADD1,
-        GGML_OP_ACC,
-        GGML_OP_SUB,
-        GGML_OP_MUL,
-        GGML_OP_DIV,
-        GGML_OP_SQR,
-        GGML_OP_SQRT,
-        GGML_OP_LOG,
-        GGML_OP_SIN,
-        GGML_OP_COS,
-        GGML_OP_SUM,
-        GGML_OP_SUM_ROWS,
+        GGML_OP_DUP,    
+        GGML_OP_ADD,        //加法
+        GGML_OP_ADD1,       
+        GGML_OP_ACC,        //累加
+        GGML_OP_SUB,        //减法
+        GGML_OP_MUL,        //乘法
+        GGML_OP_DIV,        //除法
+        GGML_OP_SQR,        //平方
+        GGML_OP_SQRT,       //开方
+        GGML_OP_LOG,        //对数
+        GGML_OP_SIN,        //sin
+        GGML_OP_COS,        //cos
+        GGML_OP_SUM,        
+        GGML_OP_SUM_ROWS,       //求行和
         GGML_OP_MEAN,
-        GGML_OP_ARGMAX,
+        GGML_OP_ARGMAX,     //最大值索引
         GGML_OP_COUNT_EQUAL,
-        GGML_OP_REPEAT,
-        GGML_OP_REPEAT_BACK,
-        GGML_OP_CONCAT,
+        GGML_OP_REPEAT,     //重复操作
+        GGML_OP_REPEAT_BACK,        //重复反向传播操作
+        GGML_OP_CONCAT,     //连接
         GGML_OP_SILU_BACK,
         GGML_OP_NORM, // normalize
-        GGML_OP_RMS_NORM,
+        GGML_OP_RMS_NORM,       //rms计算
         GGML_OP_RMS_NORM_BACK,
         GGML_OP_GROUP_NORM,
 
-        GGML_OP_MUL_MAT,
+        GGML_OP_MUL_MAT,        
         GGML_OP_MUL_MAT_ID,
         GGML_OP_OUT_PROD,
 
         GGML_OP_SCALE,
         GGML_OP_SET,
         GGML_OP_CPY,
-        GGML_OP_CONT,
-        GGML_OP_RESHAPE,
+        GGML_OP_CONT,       //创建连续张量
+        GGML_OP_RESHAPE,        //张量维度变换
         GGML_OP_VIEW,
-        GGML_OP_PERMUTE,
-        GGML_OP_TRANSPOSE,
-        GGML_OP_GET_ROWS,
-        GGML_OP_GET_ROWS_BACK,
-        GGML_OP_DIAG,
-        GGML_OP_DIAG_MASK_INF,
-        GGML_OP_DIAG_MASK_ZERO,
-        GGML_OP_SOFT_MAX,
+        GGML_OP_PERMUTE,        //排列
+        GGML_OP_TRANSPOSE,      //转置
+        GGML_OP_GET_ROWS,       //行操作
+        GGML_OP_GET_ROWS_BACK,      //反向行操作
+        GGML_OP_DIAG,       //对角
+        GGML_OP_DIAG_MASK_INF,      //对角线掩码无穷大
+        GGML_OP_DIAG_MASK_ZERO,     //对角线掩码0
+        GGML_OP_SOFT_MAX,       //softmax操作
         GGML_OP_SOFT_MAX_BACK,
         GGML_OP_ROPE,
         GGML_OP_ROPE_BACK,
@@ -1670,8 +1670,8 @@ extern "C" {
             int                   stride);
 
     enum ggml_op_pool {
-        GGML_OP_POOL_MAX,
-        GGML_OP_POOL_AVG,
+        GGML_OP_POOL_MAX,       //选择每个子区域内的最大值作为输出
+        GGML_OP_POOL_AVG,       //每个子区域内的平均值作为输出
         GGML_OP_POOL_COUNT,
     };
 

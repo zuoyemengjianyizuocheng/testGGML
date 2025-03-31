@@ -25,7 +25,7 @@ uint64_t get_time_us(void) {
 // naive implementation
 //
 
-void mul_mat_f32_0(
+void mul_mat_f32_0( 
     const float * restrict src0, // M x K
     const float * restrict src1, // N x K (transposed)
     float * dst,
@@ -122,14 +122,15 @@ int main(int argc, const char ** argv) {
     const uint64_t start_us = get_time_us();
 
     double iM = 1.0/M;
+    //循环计算矩阵乘法
     mul_mat_f32_0(src0, src1, dst0, M, N, K);
 
-    // Use BLAS sgemm from Accelerate framework
+    // Use BLAS sgemm from Accelerate framework 使用高性能的线性代数库（BLAS）中的单精度通用矩阵乘法函数
     cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans, N, M, K, 1.0f, src1, K, src0, K, 0.0f, dst1, M);
 
     struct ggml_tensor * dst2 = NULL;
     struct ggml_tensor * dst3 = NULL;
-
+    //使用GGML库中的矩阵乘法函数，分别使用32位浮点数（s0_f32, s1_f32）和16位浮点数（s0_f16, s1_f32）
     {
         dst2 = ggml_mul_mat(ctx0, s0_f32, s1_f32);
 
