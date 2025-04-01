@@ -4585,7 +4585,7 @@ struct ggml_tensor * ggml_get_rel_pos(
     GGML_ASSERT(qh == kh);
     GGML_ASSERT(2*MAX(qh, kh) - 1 == a->ne[1]);
 
-    const int64_t ne[4] = { a->ne[0], kh, qh, 1, };
+    const int64_t ne[4] = { a->ne[0], kh, qh, 1, }; //取相对tensor时维度会发生变化
     struct ggml_tensor * result = ggml_new_tensor(ctx, GGML_TYPE_F16, 3, ne);
 
     result->op     = GGML_OP_GET_REL_POS;
