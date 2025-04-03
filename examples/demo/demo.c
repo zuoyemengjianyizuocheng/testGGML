@@ -44,6 +44,17 @@ int main(void) {
     struct ggml_tensor* tensor_b = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, cols_B, rows_B);  // ggml_new_tensor_2d()会从ctx0的mem_buffer中分配一块内存来保存 tensor x
     memcpy(tensor_a->data, matrix_A, ggml_nbytes(tensor_a));   //赋值
     memcpy(tensor_b->data, matrix_B, ggml_nbytes(tensor_b));
+    float* result_data = (float*)tensor_a->data;
+    for (int j = 0; j < tensor_a->ne[1]/* rows */; j++) {
+        if (j > 0) {
+            printf("\n");
+        }
+
+        for (int i = 0; i < tensor_a->ne[0]/* cols */; i++) {
+            printf(" %.2f", result_data[j * tensor_a->ne[0] + i]);
+        }
+    }
+    printf(" ]\n");
 
 
     // 3. Create a `ggml_cgraph` for mul_mat operation为mul_mat操作创建一个‘ ggml_cgraph ’类型，构建计算图谱空间分配等基本信息
@@ -70,7 +81,7 @@ int main(void) {
     }
 
     // 5. Retrieve results (output tensors)
-    float* result_data = (float*)result->data;
+    
     printf("mul mat (%d x %d) (transposed result):\n[", (int)result->ne[0], (int)result->ne[1]);
     for (int j = 0; j < result->ne[1]/* rows */; j++) {
         if (j > 0) {

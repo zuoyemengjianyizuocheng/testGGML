@@ -32,9 +32,8 @@ void check_tensor(struct ggml_tensor * t, float * expected_t_d, int ne0, int ne1
 int main(int argc, const char** argv) {
     ggml_fp16_t buf_f16[1024];
     for (int i = 0; i < 1024; ++i) {
-        buf_f16[i] = ggml_fp32_to_fp16((float)i);
+        buf_f16[i] = ggml_fp32_to_fp16((float)i);       //在C中不显示16位float格式，显示会用unsigned short，会有特别大值
     }
-    printf("%f", buf_f16[2]);
     float expected_out[4][9] = {
         { 8.0, 9.0, 10.0, 9.0, 10.0, 11.0, 10.0, 11.0, 12.0 },
         { 2.0, 3.0, 4.0, 3.0, 4.0, 5.0, 4.0, 5.0, 6.0 },
@@ -52,25 +51,25 @@ int main(int argc, const char** argv) {
 
         struct ggml_tensor * t_2 = ggml_new_tensor_2d(ctx, GGML_TYPE_F16, 3, 3);
         ggml_fp16_t* t_d_2 = (ggml_fp16_t*)t_2->data;       
-        memcpy(t_d_2, buf_f16 + 1, ggml_nbytes(t_2));
+        memcpy(t_d_2, buf_f16, ggml_nbytes(t_2));
 
 
-        //实际计算是rw：从 t 中提取相对位置张量，形状为 (3, 2, 2)。
-        //计算逻辑：对t，取t.ne[0]次，取 t 中[i:i + 2, j : j + 2] 的 2x2 子矩阵。当先移动j的位置，再移动i，例如第1次，则是t在位置[0,0]的子矩阵构成的二维数组，当出现越界时，则对越界进行补偿，从下一行的开始位置进行补偿
-        struct ggml_tensor * rw = ggml_get_rel_pos(ctx, t, 2, 2);       //此处取相对位置张量的时候并未取值，是将t作为src[0]记录到tensor结构中
+        // ggml_get_rel_pos(ctx, t, a, a)，作用是从t中，第一次取第N=a(从1计数)行为首行，第N-1行为次行一直倒序取a次，第二次取第N=a+1(从1计数)行为首行，第N-1行为次行一直倒序取a次；整个动作重复a次
+        struct ggml_tensor * rw = ggml_get_rel_pos(ctx, t, 2, 2);       //一共两次，第一次第一步取t第2行为首行，第二步取第1行为次行，第二次取t第3行为首行，第二步取第2行为次行，取值完成
         struct ggml_tensor * rh = ggml_get_rel_pos(ctx, t_2, 2, 2);
-
-        //将相对位置张量的FP16转换为单精度浮点数（FP32），值依然未取值
-        struct ggml_tensor * rw_f32 = ggml_cpy(ctx, rw, ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2));       //copy操作，将rw与新建的ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2)进行交换，
-        struct ggml_tensor* rh_f32 = ggml_cpy(ctx, rh, ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2));
         
+
+        //将相对位置张量的FP16转换为单精度浮点数（FP32）
+        struct ggml_tensor * rw_f32 = ggml_cpy(ctx, rw, ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2));       //copy操作，将rw与新建的ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2)进行类型交换，
+        struct ggml_tensor* rh_f32 = ggml_cpy(ctx, rh, ggml_new_tensor_3d(ctx, GGML_TYPE_F32, 3, 2, 2));
 
         struct ggml_tensor * in = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 9, 4);
         struct ggml_tensor * out_inplace = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, 9, 4);
+
         float * in_d          = (float*)in->data;
         float * out_inplace_d = (float*)out_inplace->data;
         for (int i = 0; i < ggml_nelements(in); ++i) {
-            in_d[i]          = 1.f;
+            in_d[i]          = 0.f;
             out_inplace_d[i] = 1.f;
         }
 
@@ -79,8 +78,25 @@ int main(int argc, const char** argv) {
         struct ggml_cgraph * gf = ggml_new_graph(ctx);
         ggml_build_forward_expand(gf, out);
         ggml_graph_compute_with_ctx(ctx, gf, 1);
-        float* result_data1 = (float*)out->data;
-        
+
+        //struct ggml_cgraph* gf1 = ggml_new_graph(ctx);
+        //ggml_build_forward_expand(gf1, rw_f32);
+        //ggml_graph_compute_with_ctx(ctx, gf1, 1);
+        float* t_d_21 = (float*)out->data;
+        for (int k = 0; k < out->ne[2]/* rows */; k++) {
+            if (k > 0) {
+                printf("\n");
+            }
+            for (int j = 0; j < out->ne[1]/* rows */; j++) {
+                if (j > 0) {
+                    printf("\n");
+                }
+
+                for (int i = 0; i < out->ne[0]/* cols */; i++) {
+                    printf(" %f", t_d_21[k * out->ne[1] * out->ne[0] + j * out->ne[0] + i]);
+                }
+            }
+        }
 
         //使用 ggml_add_rel_pos_inplace 函数在原地修改 out_inplace
         out_inplace = ggml_add_rel_pos_inplace(ctx, out_inplace, rw_f32, rh_f32);       //out[i,j] = 1 + rw_f32[i] + rh_f32[j]
