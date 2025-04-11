@@ -338,7 +338,7 @@ void mnist_model_build(mnist_model & model) {
 
         struct ggml_tensor * images_2D = ggml_reshape_4d(model.ctx_compute, model.images, MNIST_HW, MNIST_HW, 1, model.images->ne[1]);
 
-        struct ggml_tensor * conv1_out = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,
+        struct ggml_tensor * conv1_out = ggml_relu(model.ctx_compute, ggml_add(model.ctx_compute,       //激活函数设置
             ggml_conv_2d(model.ctx_compute, model.conv1_kernel, images_2D, 1, 1, 1, 1, 1, 1),
             model.conv1_bias));
         GGML_ASSERT(conv1_out->ne[0] == MNIST_HW);
@@ -346,7 +346,7 @@ void mnist_model_build(mnist_model & model) {
         GGML_ASSERT(conv1_out->ne[2] == MNIST_CNN_NCB);
         GGML_ASSERT(conv1_out->ne[3] == model.nbatch_physical);
 
-        struct ggml_tensor * conv2_in = ggml_pool_2d(model.ctx_compute, conv1_out, GGML_OP_POOL_MAX, 2, 2, 2, 2, 0, 0);
+        struct ggml_tensor * conv2_in = ggml_pool_2d(model.ctx_compute, conv1_out, GGML_OP_POOL_MAX, 2, 2, 2, 2, 0, 0);     //池化层设置
         GGML_ASSERT(conv2_in->ne[0] == MNIST_HW/2);
         GGML_ASSERT(conv2_in->ne[1] == MNIST_HW/2);
         GGML_ASSERT(conv2_in->ne[2] == MNIST_CNN_NCB);
@@ -367,14 +367,14 @@ void mnist_model_build(mnist_model & model) {
         GGML_ASSERT(dense_in->ne[3] == model.nbatch_physical);
 
         dense_in = ggml_reshape_2d(model.ctx_compute,
-            ggml_cont(model.ctx_compute, ggml_permute(model.ctx_compute, dense_in, 1, 2, 0, 3)),
+            ggml_cont(model.ctx_compute, ggml_permute(model.ctx_compute, dense_in, 1, 2, 0, 3)),        //维度变换
             (MNIST_HW/4)*(MNIST_HW/4)*(MNIST_CNN_NCB*2), model.nbatch_physical);
         GGML_ASSERT(dense_in->ne[0] == (MNIST_HW/4)*(MNIST_HW/4)*(MNIST_CNN_NCB*2));
         GGML_ASSERT(dense_in->ne[1] == model.nbatch_physical);
         GGML_ASSERT(dense_in->ne[2] == 1);
         GGML_ASSERT(dense_in->ne[3] == 1);
 
-        model.logits = ggml_add(model.ctx_compute, ggml_mul_mat(model.ctx_compute, model.dense_weight, dense_in), model.dense_bias);
+        model.logits = ggml_add(model.ctx_compute, ggml_mul_mat(model.ctx_compute, model.dense_weight, dense_in), model.dense_bias);        //损失函数添加
     } else {
         GGML_ASSERT(false);
     }

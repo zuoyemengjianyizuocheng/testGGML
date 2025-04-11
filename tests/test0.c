@@ -10,11 +10,12 @@ int main(int argc, const char ** argv) {
         .no_alloc   = false,
     };
 
-    struct ggml_context * ctx0 = ggml_init(params);
+    struct ggml_context * ctx0 = ggml_init(params);     //内部地址以及空间初始化
 
-    struct ggml_tensor * t1 = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 10);
-    struct ggml_tensor * t2 = ggml_new_tensor_2d(ctx0, GGML_TYPE_I16, 10, 20);
-    struct ggml_tensor * t3 = ggml_new_tensor_3d(ctx0, GGML_TYPE_I32, 10, 20, 30);
+    //列，行，页
+    struct ggml_tensor * t1 = ggml_new_tensor_1d(ctx0, GGML_TYPE_F32, 10);      //1维，10个
+    struct ggml_tensor * t2 = ggml_new_tensor_2d(ctx0, GGML_TYPE_I16, 10, 20);      //2维，10*20，ne=[10,20,1,1]
+    struct ggml_tensor * t3 = ggml_new_tensor_3d(ctx0, GGML_TYPE_I32, 10, 20, 30);  //3维,10*20*30,ne=[10,20,30,1]
 
     GGML_ASSERT(ggml_n_dims(t1) == 1);
     GGML_ASSERT(t1->ne[0]  == 10);

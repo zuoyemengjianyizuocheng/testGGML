@@ -37,11 +37,11 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    mnist_model model = mnist_model_init_random(argv[1], argc >= 6 ? argv[5] : "", MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);    //模型初始化，包括网络结构，变量
+    mnist_model model = mnist_model_init_random(argv[1], argc >= 6 ? argv[5] : "", MNIST_NBATCH_LOGICAL, MNIST_NBATCH_PHYSICAL);    //模型初始化，包括网络结构，各类变量，包括分类结果等，都初始化空间
 
-    mnist_model_build(model);
+    mnist_model_build(model);       //模型各层之间的连接关系，参数层如何优化，输出结果怎么出来等
 
-    mnist_model_train(model, dataset, /*nepoch =*/ 30, /*val_split =*/ 0.05f);
+    mnist_model_train(model, dataset, /*nepoch =*/ 30, /*val_split =*/ 0.05f);      //模型训练，包括参数优化，损失计算，循环30次，验证集比例5%
 
-    mnist_model_save(model, argv[2]);
+    mnist_model_save(model, argv[2]);       //存储模型
 }
